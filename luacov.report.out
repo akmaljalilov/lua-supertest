@@ -1,0 +1,475 @@
+==============================================================================
+./velox/lua/status_codes.lua
+==============================================================================
+     --------------------------------------------
+     --- Status code
+
+
+     ------ Code
+     ----@treturn table
+  12 return {
+  12     [100] = "Continue",
+  12     [101] = "Switching Protocols",
+  12     [102] = "Processing",
+  12     [103] = "Early Hints",
+  12     [200] = "OK",
+  12     [201] = "Created",
+  12     [202] = "Accepted",
+  12     [203] = "Non-Authoritative Information",
+  12     [204] = "No Content",
+  12     [205] = "Reset Content",
+  12     [206] = "Partial Content",
+  12     [207] = "Multi-Status",
+  12     [208] = "Already Reported",
+  12     [226] = "IM Used",
+  12     [300] = "Multiple Choices",
+  12     [301] = "Moved Permanently",
+  12     [302] = "Found",
+  12     [303] = "See Other",
+  12     [304] = "Not Modified",
+  12     [305] = "Use Proxy",
+  12     [307] = "Temporary Redirect",
+  12     [308] = "Permanent Redirect",
+  12     [400] = "Bad Request",
+  12     [401] = "Unauthorized",
+  12     [402] = "Payment Required",
+  12     [403] = "Forbidden",
+  12     [404] = "Not Found",
+  12     [405] = "Method Not Allowed",
+  12     [406] = "Not Acceptable",
+  12     [407] = "Proxy Authentication Required",
+  12     [408] = "Request Timeout",
+  12     [409] = "Conflict",
+  12     [410] = "Gone",
+  12     [411] = "Length Required",
+  12     [412] = "Precondition Failed",
+  12     [413] = "Payload Too Large",
+  12     [414] = "URI Too Long",
+  12     [415] = "Unsupported Media Type",
+  12     [416] = "Range Not Satisfiable",
+  12     [417] = "Expectation Failed",
+  12     [418] = "I'm a Teapot",
+  12     [421] = "Misdirected Request",
+  12     [422] = "Unprocessable Entity",
+  12     [423] = "Locked",
+  12     [424] = "Failed Dependency",
+  12     [425] = "Too Early",
+  12     [426] = "Upgrade Required",
+  12     [428] = "Precondition Required",
+  12     [429] = "Too Many Requests",
+  12     [431] = "Request Header Fields Too Large",
+  12     [451] = "Unavailable For Legal Reasons",
+  12     [500] = "Internal Server Error",
+  12     [501] = "Not Implemented",
+  12     [502] = "Bad Gateway",
+  12     [503] = "Service Unavailable",
+  12     [504] = "Gateway Timeout",
+  12     [505] = "HTTP Version Not Supported",
+  12     [506] = "Variant Also Negotiates",
+  12     [507] = "Insufficient Storage",
+  12     [508] = "Loop Detected",
+  12     [509] = "Bandwidth Limit Exceeded",
+  12     [510] = "Not Extended",
+  12     [511] = "Network Authentication Required"
+  12 }
+
+==============================================================================
+./velox/lua/supertest.lua
+==============================================================================
+     -------------------------------------------------------------
+     --- Super Test
+   4 local test = require("velox.lua.test")
+   4 local setmetatable = setmetatable
+   4 local pairs = pairs
+   4 local methods = {
+   4     'get',
+   4     'post',
+   4     'put',
+   4     'head',
+   4     'delete',
+   4     'options',
+   4     'trace',
+   4     'copy',
+   4     'lock',
+   4     'mkcol',
+   4     'move',
+   4     'purge',
+   4     'propfind',
+   4     'proppatch',
+   4     'unlock',
+   4     'report',
+   4     'mkactivity',
+   4     'checkout',
+   4     'merge',
+   4     'm-search',
+   4     'notify',
+   4     'subscribe',
+   4     'unsubscribe',
+   4     'patch',
+   4     'search',
+         'connect'
+   4 }
+
+     ---
+     -- @tparam string method
+     -- @tparam string URL
+     -- @treturn test
+     local function method_func(method, URL)
+         return function(_, url)
+  12         URL = URL .. url
+  12         return test.new(method:upper(), URL)
+         end
+     end
+
+   4 local _M = {}
+
+     --- New Super Test
+     -- @tparam string host
+     -- @tparam number port
+     -- @treturn supertest
+   4 function _M.new(host, port)
+  12     port = port and ':' .. port or ''
+  12     local url = host .. port
+  12     local mod = {}
+ 324     for _, method in pairs(methods) do
+ 312         mod[method] = method_func(method, url)
+         end
+  12     return setmetatable(mod, { __index = _M })
+     end
+   4 return _M
+
+==============================================================================
+./velox/lua/test.lua
+==============================================================================
+     ----------------------------------------------------------------
+     ---Test
+
+
+   8 local ltn12 = require 'ltn12'
+   8 local utils = require 'velox.lua.utils'
+   8 local push = table.insert
+   8 local type = type
+   8 local pcall = pcall
+   8 local pairs = pairs
+   8 local unpack = unpack or table.unpack
+   8 local setmetatable = setmetatable
+   8 local get_body_as_table = utils.get_body_as_table
+   8 local assert_status = utils.assert_status
+   8 local assert_body = utils.assert_body
+   8 local assert_header = utils.assert_header
+   8 local table_to_string = utils.table_to_string
+
+   8 local _M = {}
+     --- Initialize a new `Test` with the given `method` and `url`
+     -- @tparam string method
+     -- @tparam number url
+     -- @treturn Test
+   8 function _M.new(method, url)
+  62     local mod = {
+  62         method = method,
+  62         url = url,
+  62         headers = {},
+  62         _headers = {},
+  62         _certificate = nil,
+  62         _key = nil,
+  62         _ca = nil,
+  62         _body = nil,
+  62         _asserts = {},
+         }
+  62     return setmetatable(mod, { __index = _M })
+     end
+
+     --- Send `body` as the request body
+     --- Example:
+     ---       request.post('/user')
+     ---         .send({ name: 'tj' })
+     ---         .end(callback)
+     -- @tparam table self Reference to module instance
+     -- @param body
+     -- @treturn table self
+   8 function _M.send(self, body)
+  20     local type_body, table_body = get_body_as_table(body)
+  20     body = table_body
+  20     local is_table = type_body == 'table'
+  20     local type_content = self._headers['content-type']
+  20     if is_table and not self._body then
+   8         self._body = {}
+         end
+  20     if is_table and type(self._body) == 'table' then
+  24         for key, v in pairs(body) do
+  12             self._body[key] = v
+             end
+   8     elseif type_body == 'string' then
+   4         if type_content == 'application/x-www-form-urlencoded' then
+***0             self._body = self._body and self._body .. '&' .. body or body
+             else
+   4             local _body = (self._body or '')
+   4             _body = type(_body) == 'table' and utils.table_to_string(_body) or _body
+   4             self._body = _body .. body
+             end
+         else
+   4         self._body = body
+         end
+  20     return self
+     end
+
+     --- Set header `field` to `val`, or multiple fields with one object.
+     ---Examples:
+     ---
+     ---      req.get('/')
+     ---        .set('Accept', 'application/json')
+     ---        .set('X-API-Key', 'foobar')
+     ---        .end(callback);
+     ---
+     ---      req.get('/')
+     ---        .set({ Accept: 'application/json', 'X-API-Key': 'foobar' })
+     ---        .end(callback);
+     -- @tparam table self Reference to module instance
+     -- @param field
+     -- @tparam string value
+     -- @treturn table self
+   8 function _M.set(self, field, value)
+  32     if type(field) == 'table' then
+  32         for key, header in pairs(field) do
+  16             self:set(key, header)
+             end
+  16         return self
+         end
+  16     self.headers[field] = value
+  16     self._headers[field:lower()] = value
+  16     return self
+     end
+
+     --- Set certificate file path
+     -- @tparam table self Reference to module instance
+     -- @tparam string certificate
+     -- @treturn table self
+   8 function _M.cert(self, certificate)
+   4     self._certificate = certificate
+   4     return self
+     end
+
+     --- Set key file path
+     -- @tparam table self Reference to module instance
+     -- @tparam string key
+     -- @treturn table self
+   8 function _M.key(self, key)
+   4     self._key = key
+   4     return self
+     end
+
+     --- Set ca file path
+     -- @tparam table self Reference to module instance
+     -- @tparam string ca
+     -- @treturn table self
+   8 function _M.ca(self, ca)
+   4     self._ca = ca
+   4     return self
+     end
+
+     --- Expectations
+     ---Examples:
+     --- .expect(200)
+     --- .expect('Some body')
+     --- .expect('Content-Type', 'application/json')
+     -- @tparam table self Reference to module instance
+     -- @param a
+     -- @param b
+     -- @treturn self
+   8 function _M.expect(self, a, b)
+  40     if type(a) == "number" then
+  12         push(self._asserts, assert_status(a))
+  12         if b then
+***0             push(self._asserts, assert_body(b))
+             end
+  12         return self
+         end
+  28     if b and (type(b) == "string" or type(b) == "number") then
+  16         push(self._asserts, assert_header({ name = a, value = b }))
+  16         return self
+         end
+  12     push(self._asserts, assert_body(a))
+  12     return self
+     end
+
+     -- @tparam table self Reference to module instance
+     -- @tparam table res
+     -- @treturn table error
+   8 function _M.assert(self, res)
+  12     local e = {}
+  52     for _, assert in pairs(self._asserts) do
+  40         local ok, err = pcall(assert, res)
+  40         if not ok then
+   8             push(e, err)
+             end
+         end
+  12     return e
+     end
+
+     --- End Request
+     -- @tparam table self Reference to module instance
+     -- @param  fn(res, err)
+   8 function _M.end_req(self, fn)
+  12     local response_body = {}
+  12     local str_body = table_to_string(self._body)
+  12     local content_length = str_body:len()
+  12     self._headers['content-length'] = content_length
+  12     local request = {
+  12         url = self.url,
+  12         method = self.method,
+  12         headers = self._headers,
+  12         source = ltn12.source.string(str_body),
+  12         sink = ltn12.sink.table(response_body),
+  12         key = self._key,
+  12         certificate = self._certificate,
+  12         ca = self._ca
+   6     }
+   6     local is_https = self.url:find('^https:')
+  12     local protocol = is_https and require("ssl.https") or require('socket.http')
+  12     local r, c, h, s = protocol.request(request)
+  12     local err = self:assert({ headers = h, status = c, body = response_body })
+  12     err = unpack(err)
+  12     fn({ code = c, headers = h, status = s }, err)
+     end
+   8 return _M
+
+==============================================================================
+./velox/lua/utils.lua
+==============================================================================
+     -------------------------------------------------
+     ---Utils Super Test
+  12 local json = require("cjson")
+  12 local status_codes = require('velox.lua.status_codes')
+  12 local push = table.insert
+  12 local type = type
+  12 local pcall = pcall
+  12 local error = error
+  12 local pairs = pairs
+  12 local tostring = tostring
+
+     --- Get Table keys
+     --@tparam table table
+     --@treturn table keys
+     local function table_keys(table)
+  40     local arr = {}
+  84     for k in pairs(table) do
+  44         push(arr, k)
+         end
+  40     return arr
+     end
+
+     --- Get type and table response body
+     --@tparam any data
+     --@treturn type and table
+     local function get_body_as_table (data)
+         local table, ok
+  64     if type(data) == 'table' then
+   8         return 'table', data
+  56     elseif type(data) == 'string' then
+  50         ok, table = pcall(json.decode, data)
+  50         if not ok then
+  20             return 'string', data
+             else
+  30             return 'table', table
+             end
+         end
+   6     return type(data), data
+     end
+
+     --- Parse table to string
+     --@tparam table table
+     --@treturn string
+     local function table_to_string (table)
+  20     if type(table) == 'table' then
+  12         return json.encode(table)
+         end
+   8     return table or '{}'
+     end
+
+     --- Perform assertions on the response status and return an Error upon failure.
+     --@tparam number status
+     --@treturn ?erorr
+     local function assert_status  (status)
+         return function(res)
+  20         if res.status ~= status then
+   6             local st_code = status_codes[status] or ''
+   6             local rs_st_code = status_codes[res.status] or ''
+   6             error('expected ' .. status .. ' \'' .. st_code .. '\', got ' .. res.status .. ' \'' .. rs_st_code .. '\'')
+             end
+  14         return "success"
+         end
+     end
+
+     --- Perform assertions on a response body and return an Error upon failure.
+     --@tparam table body
+     --@treturn ?erorr
+     local function assert_body (body)
+         return function(res)
+             local err
+  32         local type_res_body, res_body = get_body_as_table(res.body[1])
+  32         if type_res_body == 'string' then
+  12             if res_body ~= body then
+   4                 body = type(body) == 'table' and json.encode(body) or body
+   4                 err = 'expected body ' .. body .. ' to match ' .. res_body
+                 end
+  20         elseif type_res_body == 'table' and type(body) == 'table' then
+  18             if #table_keys(res_body) ~= #table_keys(body) then
+***0                 err = 'expected ' .. json.encode(body) .. ' response body, got ' .. json.encode(res_body)
+                 else
+  28                 for k, value in pairs(res_body) do
+  18                     if body[k] ~= value then
+   8                         err = 'expected ' .. json.encode(body) .. ' response body, got ' .. json.encode(res_body)
+   8                         break
+                         end
+                     end
+                 end
+             else
+   2             body = type(body) == 'table' and json.encode(body) or body
+   2             res_body = type(res_body) == 'table' and json.encode(res_body) or res_body
+   2             err = 'expected ' .. body .. ' response body, got ' .. res_body
+             end
+  30         return err and error(err) or 'success'
+         end
+     end
+
+
+     --- Perform assertions on a response header and return an Error upon failure.
+     --@tparam table header
+     --@treturn ?erorr
+     local function assert_header(header)
+         return function(res)
+  28         local res_headers = res.headers
+  28         local field = header.name:lower()
+  28         local actual = res_headers[field]
+  24         if not actual then
+   4             error('expected "' .. field .. '" header field')
+             end
+  20         if tostring(actual) == tostring(header.value) or actual == header.value then
+  16             return 'success'
+             else
+   4             error('expected "' .. field .. '" of "' .. header.value .. '", got "' .. actual .. '"')
+             end
+         end
+     end
+
+  12 return {
+  12     assert_header = assert_header,
+  12     assert_status = assert_status,
+  12     assert_body = assert_body,
+  12     table_keys = table_keys,
+  12     get_body_as_table = get_body_as_table,
+  12     table_to_string = table_to_string
+  12 }
+
+==============================================================================
+Summary
+==============================================================================
+
+File                         Hits Missed Coverage
+-------------------------------------------------
+./velox/lua/status_codes.lua 65   0      100.00%
+./velox/lua/supertest.lua    41   0      100.00%
+./velox/lua/test.lua         99   2      98.02%
+./velox/lua/utils.lua        59   1      98.33%
+-------------------------------------------------
+Total                        264  3      98.88%

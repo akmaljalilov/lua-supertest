@@ -1,0 +1,12 @@
+return {
+    include = {
+    "./velox"
+    },
+    statfile = "luacov.stats.out",
+    reportfile = "luacov.report.out",
+    runreport = true,
+      exclude = {
+      "spec/*"
+      }
+
+}

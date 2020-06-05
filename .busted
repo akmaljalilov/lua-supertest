@@ -1,0 +1,12 @@
+return {
+    _all = {
+        coverage = true,
+        output ="junit",
+        ROOT = {"./spec"},
+        lpath = "./?.lua;./spec/?.lua"
+
+    },
+    default = {
+       verbose = true,
+    }
+}

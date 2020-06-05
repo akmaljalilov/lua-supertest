@@ -13,13 +13,15 @@ description = {
 
 dependencies = {
   'lua >= 5.1',
-  'luasocket'
+  'luasec',
+  'luasocket',
 }
 build = {
   type = 'builtin',
   modules = {
-    ['client']    = 'client.lua',
-    ['supertest'] = 'supertest.lua',
-    ['Test']      = 'Test.lua',
+    ["vleox.lua.status_codes"]    = "vleox/lua/status_codes.lua",
+    ["vleox.lua.supertest"]       = "vleox/lua/supertest.lua",
+    ["vleox.lua.test"]            = "vleox/lua/test.lua",
+    ["vleox.lua.utils"]           = "vleox/lua/utils.lua",
   }
 }

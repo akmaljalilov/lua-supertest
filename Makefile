@@ -1,5 +1,5 @@
 lint:
-    luacheck .
+	luacheck .
 
 luarocks: lint
 	sudo luarocks make supertest-*.rockspec
