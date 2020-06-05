@@ -1,7 +1,6 @@
 package = 'supertest'
 version = '0.0.0-1'
 source = {
-  url = "//github.com/ajalilov/lua-supertest",
   branch = "master"
 }
 description = {
